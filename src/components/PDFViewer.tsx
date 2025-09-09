@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
-import {
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PDFViewerProps {
   file: string; // Path or URL to PDF
@@ -66,27 +63,29 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
     }
   };
 
+  const inFullscreen = () => {
+    return (
+      document.fullscreenElement === containerRef.current ||
+      (document as any).webkitFullscreenElement === containerRef.current ||
+      (document as any).mozFullScreenElement === containerRef.current ||
+      (document as any).msFullscreenElement === containerRef.current
+    );
+  };
+
   useEffect(() => {
     function updateWidth() {
       if (containerRef.current) {
         setPageWidth(containerRef.current.clientWidth);
       }
     }
-
-    // Initial width measurement
     updateWidth();
-
-    // Update on window resize
     window.addEventListener("resize", updateWidth);
-
-    // Optional: Use ResizeObserver to track container size changes
     const resizeObserver = new ResizeObserver(() => {
       updateWidth();
     });
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
-
     return () => {
       window.removeEventListener("resize", updateWidth);
       if (containerRef.current) {
@@ -103,7 +102,6 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
         goToNextPage();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -152,11 +150,9 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
           </button>
         </div>
       </div>
-
-      {/* PDF Content */}
       <div
         ref={containerRef}
-        className="border rounded-lg shadow-lg bg-white p-4 max-w-4xl w-full flex justify-center"
+        className="border rounded-lg shadow-lg bg-white p-4 max-w-4xl w-full flex justify-center relative"
         style={{ height: isFullscreen ? "100vh" : undefined, overflow: "auto" }}
       >
         <Document
@@ -169,8 +165,32 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
             width={pageWidth}
             renderAnnotationLayer={false}
             renderTextLayer={false}
+            className="relative z-0" // explicitly make canvas lower
           />
         </Document>
+
+        {/* Fullscreen prev/next buttons */}
+        {inFullscreen() && (
+          <>
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage <= 1}
+              className="fixed top-1/2 left-4 transform -translate-y-1/2 z-50 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+              aria-label="Previous page"
+            >
+              &lt;
+            </button>
+
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage >= numPages}
+              className="fixed top-1/2 right-4 transform -translate-y-1/2 z-50 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+              aria-label="Next page"
+            >
+              &gt;
+            </button>
+          </>
+        )}
       </div>
 
       {/* Page Navigation */}
