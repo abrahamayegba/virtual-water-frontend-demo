@@ -103,10 +103,10 @@ const handleNext = () => {
         );
 
       case "powerpoint":
-        return <PDFViewer file="/legionella-course.pdf" title={lesson.title} />;
+        return <PDFViewer file="/legionella-awareness-revised.pdf" title={lesson.title} />;
 
       case "pdf":
-        return <PDFViewer file="/legionella-course.pdf" title={lesson.title} />;
+        return <PDFViewer file="/legionella-awareness-revised.pdf" title={lesson.title} />;
 
       default:
         return (

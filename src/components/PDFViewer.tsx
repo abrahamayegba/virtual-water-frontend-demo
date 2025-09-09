@@ -1,13 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import {
   ChevronLeft,
   ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  Download,
 } from "lucide-react";
-
 
 interface PDFViewerProps {
   file: string; // Path or URL to PDF
@@ -17,7 +13,9 @@ interface PDFViewerProps {
 export default function PDFViewer({ file, title }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scale, setScale] = useState(1.0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pageWidth, setPageWidth] = useState(0);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -26,8 +24,6 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
 
   const goToPrevPage = () => setCurrentPage((p) => Math.max(1, p - 1));
   const goToNextPage = () => setCurrentPage((p) => Math.min(numPages, p + 1));
-  const zoomIn = () => setScale((s) => Math.min(2.0, s + 0.2));
-  const zoomOut = () => setScale((s) => Math.max(0.5, s - 0.2));
 
   const downloadPDF = () => {
     const link = document.createElement("a");
@@ -36,9 +32,86 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
     link.click();
   };
 
+  const enterFullscreen = () => {
+    if (containerRef.current) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      } else if ((containerRef.current as any).webkitRequestFullscreen) {
+        (containerRef.current as any).webkitRequestFullscreen();
+      } else if ((containerRef.current as any).mozRequestFullScreen) {
+        (containerRef.current as any).mozRequestFullScreen();
+      } else if ((containerRef.current as any).msRequestFullscreen) {
+        (containerRef.current as any).msRequestFullscreen();
+      }
+    }
+  };
+
+  const exitFullscreen = () => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if ((document as any).webkitExitFullscreen) {
+      (document as any).webkitExitFullscreen();
+    } else if ((document as any).mozCancelFullScreen) {
+      (document as any).mozCancelFullScreen();
+    } else if ((document as any).msExitFullscreen) {
+      (document as any).msExitFullscreen();
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (isFullscreen) {
+      exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    function updateWidth() {
+      if (containerRef.current) {
+        setPageWidth(containerRef.current.clientWidth);
+      }
+    }
+
+    // Initial width measurement
+    updateWidth();
+
+    // Update on window resize
+    window.addEventListener("resize", updateWidth);
+
+    // Optional: Use ResizeObserver to track container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth();
+    });
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateWidth);
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        goToPrevPage();
+      } else if (e.key === "ArrowRight") {
+        goToNextPage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [goToPrevPage, goToNextPage]);
+
   return (
     <div className="flex flex-col items-center space-y-4">
-      {/* Controls */}
       <div className="flex items-center justify-between w-full max-w-4xl bg-gray-100 p-4 rounded-lg">
         <div className="flex items-center space-x-2">
           <button
@@ -62,33 +135,30 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
           </button>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          {/* Fullscreen toggle button */}
           <button
-            onClick={zoomOut}
-            className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            onClick={toggleFullscreen}
+            className="p-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
-            <ZoomOut className="h-4 w-4" />
+            {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           </button>
-          <span className="text-sm font-medium">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            onClick={zoomIn}
-            className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
+
           <button
             onClick={downloadPDF}
             className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
-            <Download className="h-4 w-4" />
+            Download
           </button>
         </div>
       </div>
 
       {/* PDF Content */}
-      <div className="border rounded-lg shadow-lg bg-white p-4 max-w-4xl w-full flex justify-center">
+      <div
+        ref={containerRef}
+        className="border rounded-lg shadow-lg bg-white p-4 max-w-4xl w-full flex justify-center"
+        style={{ height: isFullscreen ? "100vh" : undefined, overflow: "auto" }}
+      >
         <Document
           file={file}
           onLoadSuccess={onDocumentLoadSuccess}
@@ -96,7 +166,7 @@ export default function PDFViewer({ file, title }: PDFViewerProps) {
         >
           <Page
             pageNumber={currentPage}
-            scale={scale}
+            width={pageWidth}
             renderAnnotationLayer={false}
             renderTextLayer={false}
           />
